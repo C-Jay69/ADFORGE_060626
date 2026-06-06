@@ -1,0 +1,808 @@
+════════════════════════════════════════════════════════════════════════
+SYSTEM PROMPT — AI VIDEO AD PLATFORM (MVP BUILD)
+CODENAME: "ADFORGE"
+AUTHOR: Solo Dev / Founder
+VERSION: 1.0 — MVP TARGET
+════════════════════════════════════════════════════════════════════════
+
+You are a full-stack AI application. Your job is to be built, deployed,
+and scaled by a single developer. Every architectural decision below has
+been made with three constraints in mind: (1) speed of build, (2) zero
+unnecessary complexity, and (3) a product that is immediately superior
+to every existing tool in this category on day one of launch.
+
+Do not add what I haven't asked for. Do not suggest alternatives. Build
+exactly what is described. Every decision below is final and has already
+been deliberated.
+
+────────────────────────────────────────────────────────────────────────
+SECTION 1 — PROJECT OVERVIEW
+────────────────────────────────────────────────────────────────────────
+
+Build a web-based SaaS platform called "AdForge" — an AI-powered video
+ad creation studio purpose-built for performance marketers, e-commerce
+founders, and growth agencies.
+
+Unlike existing tools, AdForge is a COMPLETE end-to-end ad production
+pipeline. It is not just a video generator. It covers the full lifecycle:
+
+  IDEA → SCRIPT → ACTOR → GENERATE → EDIT → EXPORT → PUBLISH
+
+Every competitor stops at GENERATE. We do not.
+
+The platform solves the following verified pain points of the current
+market leader (and all competitors):
+
+  PAIN POINT 1: No built-in editor. Solved. We build the editor.
+  PAIN POINT 2: No free trial. Solved. Freemium model from day one.
+  PAIN POINT 3: Hidden pricing. Solved. Fully transparent pricing page.
+  PAIN POINT 4: Weak script tools. Solved. Full AI script studio.
+  PAIN POINT 5: Credit caps feel punishing. Solved. Subscription by
+                 seat + output minutes, not per-video credits.
+  PAIN POINT 6: Top of funnel only. Solved. Retargeting script variants
+                 and post-click landing page copy generation included.
+  PAIN POINT 7: No physical product interaction. Solved. Product overlay
+                 engine with depth-mapped actor-product compositing.
+  PAIN POINT 8: No campaign structure. Solved. Full campaign workspace
+                 with hook variants, angle tracking, and test logging.
+
+────────────────────────────────────────────────────────────────────────
+SECTION 2 — TECH STACK (NON-NEGOTIABLE)
+────────────────────────────────────────────────────────────────────────
+
+FRONTEND:
+  - Framework:        Next.js 14 (App Router)
+  - Language:         TypeScript (strict mode, no exceptions)
+  - Styling:          Tailwind CSS + shadcn/ui component library
+  - Animation:        Framer Motion (page transitions, micro-interactions)
+  - State Management: Zustand (lightweight, no Redux complexity)
+  - Video Player:     Video.js (custom skinned to match brand)
+  - Canvas/Editor:    Fabric.js (for the in-app video editor layer)
+  - Forms:            React Hook Form + Zod validation
+  - Icons:            Lucide React
+
+BACKEND:
+  - Runtime:          Node.js with Next.js API Routes (keep it mono-repo)
+  - Database:         PostgreSQL via Supabase (auth + DB + storage
+                      in one — solo dev's best friend)
+  - ORM:              Prisma
+  - Queue System:     Inngest (for async video generation jobs —
+                      do NOT block the UI thread on generation)
+  - File Storage:     Supabase Storage (videos, thumbnails, assets)
+  - CDN:              Cloudflare (wrap all asset delivery through CF)
+
+AI / ML INTEGRATIONS:
+  - Avatar Video Gen: Hedra API (primary) + D-ID API (fallback)
+  - LLM (Scripts):    OpenAI GPT-4o (script writing, hook generation,
+                      angle suggestions, ad copy)
+  - Voice:            ElevenLabs API (premium voice, all plans — not
+                      locked to Pro. This is a differentiator.)
+  - Translation:      DeepL API (more accurate than Google for
+                      marketing copy in 30+ languages)
+  - B-Roll Gen:       Runway ML Gen-3 API (cinematic b-roll from prompt)
+  - Captions:         AssemblyAI (transcription) → auto-caption burn
+  - Background Music: Epidemic Sound API (licensed, no copyright risk)
+  - Product Overlay:  Replicate API (background removal + depth
+                      compositing for product-in-hand scenes)
+  - Upscaling:        Replicate (Real-ESRGAN model)
+
+PAYMENTS:
+  - Stripe (subscriptions, usage-based billing, customer portal)
+  - Stripe Billing Portal for self-serve plan management (no support
+    tickets for billing — ever)
+
+DEPLOYMENT:
+  - Hosting:          Vercel (frontend + API routes)
+  - DB:               Supabase (managed Postgres)
+  - Background Jobs:  Inngest Cloud
+  - Monitoring:       Sentry (error tracking) + Vercel Analytics
+  - Logging:          Axiom
+  - CI/CD:            GitHub Actions → auto-deploy on push to main
+
+DOMAIN / EMAIL:
+  - Domain:           adforge.ai
+  - Transactional:    Resend (beautiful HTML emails, dead simple API)
+  - Email Templates:  React Email
+
+────────────────────────────────────────────────────────────────────────
+SECTION 3 — DATABASE SCHEMA (PRISMA)
+────────────────────────────────────────────────────────────────────────
+
+Define the following models in schema.prisma:
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  avatarUrl       String?
+  stripeCustomerId String?  @unique
+  plan            Plan      @default(FREE)
+  minutesUsed     Float     @default(0)
+  minutesLimit    Float     @default(3)   // Free = 3 mins output
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspaces      WorkspaceMember[]
+  projects        Project[]
+}
+
+model Workspace {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  plan        Plan      @default(FREE)
+  members     WorkspaceMember[]
+  projects    Project[]
+  createdAt   DateTime  @default(now())
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        Role      @default(MEMBER)
+  user        User      @relation(fields: [userId], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  workspaceId String
+  userId      String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+  campaigns   Campaign[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  name        String
+  objective   String?   // e.g. "Drive app installs", "Product launch"
+  platform    Platform[]
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+  scripts     Script[]
+  ads         Ad[]
+  createdAt   DateTime  @default(now())
+}
+
+model Script {
+  id          String    @id @default(cuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  hook        String
+  body        String
+  cta         String
+  angle       String?   // e.g. "Pain Point", "Social Proof", "Curiosity"
+  tone        String?   // e.g. "Friendly", "Urgent", "Playful"
+  language    String    @default("en")
+  aiGenerated Boolean   @default(false)
+  ads         Ad[]
+  createdAt   DateTime  @default(now())
+}
+
+model Actor {
+  id          String    @id @default(cuid())
+  name        String
+  previewUrl  String    // short looping preview clip
+  thumbnailUrl String
+  gender      String
+  ageRange    String
+  ethnicity   String
+  style       String    // casual, professional, energetic, etc.
+  accent      String
+  voiceId     String    // ElevenLabs voice ID
+  hedraActorId String?  // mapped to Hedra API actor
+  isActive    Boolean   @default(true)
+  ads         Ad[]
+}
+
+model Ad {
+  id              String    @id @default(cuid())
+  campaignId      String
+  scriptId        String
+  actorId         String
+  campaign        Campaign  @relation(fields: [campaignId], references: [id])
+  script          Script    @relation(fields: [scriptId], references: [id])
+  actor           Actor     @relation(fields: [actorId], references: [id])
+  status          AdStatus  @default(QUEUED)
+  emotionTag      String?
+  outputUrl       String?   // final rendered video URL
+  thumbnailUrl    String?
+  durationSeconds Float?
+  minutesConsumed Float?
+  format          VideoFormat @default(VERTICAL)
+  hasSubtitles    Boolean   @default(false)
+  hasBRoll        Boolean   @default(false)
+  hasMusic        Boolean   @default(false)
+  language        String    @default("en")
+  jobId           String?   // Inngest job ID for tracking
+  editState       Json?     // Fabric.js canvas state for editor
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  exports         Export[]
+}
+
+model Export {
+  id          String    @id @default(cuid())
+  adId        String
+  ad          Ad        @relation(fields: [adId], references: [id])
+  format      String    // "mp4_9x16", "mp4_1x1", "mp4_16x9"
+  url         String
+  fileSize    Int?
+  createdAt   DateTime  @default(now())
+}
+
+enum Plan {
+  FREE
+  STARTER
+  GROWTH
+  AGENCY
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum Platform {
+  TIKTOK
+  META
+  YOUTUBE
+  INSTAGRAM
+  LINKEDIN
+  PINTEREST
+}
+
+enum AdStatus {
+  QUEUED
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+enum VideoFormat {
+  VERTICAL    // 9:16
+  SQUARE      // 1:1
+  LANDSCAPE   // 16:9
+}
+
+────────────────────────────────────────────────────────────────────────
+SECTION 4 — PRICING ARCHITECTURE (PUBLIC, ON THE WEBSITE)
+────────────────────────────────────────────────────────────────────────
+
+All pricing is displayed publicly. No sign-up wall to see pricing.
+This is a trust signal and a direct attack on the competition.
+
+  FREE TIER — $0/month
+  ├── 3 minutes of video output total (lifetime)
+  ├── Access to 25 actors
+  ├── 1 project / 1 campaign
+  ├── Basic script editor (no AI generation)
+  ├── MP4 export with AdForge watermark
+  ├── 720p output
+  └── Purpose: Let users actually feel the product before paying.
+      No credit card required. Ever. For the free tier.
+
+  STARTER — $49/month (or $39/mo billed annually)
+  ├── 30 minutes of video output/month (rollover up to 60)
+  ├── 150+ actors
+  ├── AI Script Studio (GPT-4o powered)
+  ├── Hook generator + angle suggestions
+  ├── Built-in video editor (captions, music, trim, transitions)
+  ├── ElevenLabs voices (standard tier)
+  ├── 15 languages
+  ├── 1080p output, no watermark
+  ├── 3 projects, unlimited campaigns
+  └── Email support
+
+  GROWTH — $99/month (or $79/mo billed annually)
+  ├── 90 minutes of video output/month (rollover up to 180)
+  ├── 300+ actors
+  ├── Everything in Starter
+  ├── Product overlay engine (hold/wear/show product)
+  ├── B-Roll generation (Runway ML)
+  ├── Speech-to-speech voice cloning
+  ├── 30+ languages + DeepL translation
+  ├── Bulk generation (up to 20 ads in one batch)
+  ├── A/B test tracker (log performance data per ad variant)
+  ├── Retargeting script generator
+  ├── Post-click landing page copy generator
+  ├── 4K upscaling
+  ├── Team workspace (up to 3 seats)
+  └── Priority support + Slack community
+
+  AGENCY — $249/month (or $199/mo billed annually)
+  ├── 300 minutes of video output/month
+  ├── 500+ actors
+  ├── Everything in Growth
+  ├── Unlimited projects and workspaces
+  ├── White-label export (client branding on exports)
+  ├── API access (full REST API)
+  ├── Custom actor cloning (upload footage → own AI actor)
+  ├── Bulk generation (up to 100 ads in one batch)
+  ├── Team workspace (up to 10 seats)
+  ├── Client management dashboard
+  ├── Dedicated onboarding call
+  └── Dedicated Slack channel support
+
+  ADDITIONAL MINUTES (all paid plans):
+  └── $1.50 per additional output minute (on-demand, no plan upgrade
+      required — eliminates the "credit anxiety" problem completely)
+
+────────────────────────────────────────────────────────────────────────
+SECTION 5 — FULL FEATURE SPECIFICATION
+────────────────────────────────────────────────────────────────────────
+
+5.1 — AI SCRIPT STUDIO (THE #1 DIFFERENTIATOR VS. COMPETITORS)
+
+  Build a multi-step script generation interface:
+
+  STEP 1: BRIEF INPUT
+    Input fields:
+    - Product/service name
+    - One-line description
+    - Target audience (who are they? what do they want?)
+    - Primary pain point being solved
+    - Target platform (TikTok / Meta / YouTube / etc.)
+    - Desired tone (dropdown: Friendly / Urgent / Playful / Educational
+                    / Authoritative / Emotional / Humorous)
+    - Ad objective (dropdown: Awareness / Clicks / App Install /
+                   Purchase / Lead Gen / Retargeting)
+    - Video length target (15s / 30s / 60s / 90s)
+
+  STEP 2: AI GENERATES 3 COMPLETE SCRIPT VARIANTS
+    Each variant includes:
+    - Hook (opening 3 seconds — the scroll-stopper)
+    - Body (problem + solution narrative)
+    - CTA (specific, platform-appropriate)
+    - Angle label (e.g. "Pain Point Agitation", "Social Proof",
+      "Before/After", "Curiosity Gap", "Authority Play")
+    - Estimated watch-through rate prediction label
+      (High / Medium / Low — based on known patterns)
+
+  STEP 3: HOOK EXPANDER
+    User can click any variant and generate 5 alternative hooks
+    for the same script body. This solves the "I want to test 5
+    different openers with the same script" use case in 10 seconds.
+
+  STEP 4: RETARGETING VARIANT (GROWTH + AGENCY PLANS)
+    One-click: "Generate retargeting version of this script"
+    Produces a script assuming the viewer has already seen the
+    original ad — speaks to familiarity, pushes urgency/proof.
+
+  STEP 5: LANDING PAGE COPY BLOCK (GROWTH + AGENCY PLANS)
+    After script approval, generate matching above-the-fold
+    landing page copy:
+    - Headline
+    - Subheadline
+    - 3 bullet benefits
+    - CTA button text
+    Ensures message match between ad and landing page — a huge
+    performance lever that zero competitors address.
+
+5.2 — ACTOR SELECTION ENGINE
+
+  Actor grid with the following filters:
+  - Gender (All / Male / Female / Non-binary)
+  - Age Range (18-25 / 26-35 / 36-50 / 50+)
+  - Ethnicity (open, diverse, non-stereotyped labelling)
+  - Style (Casual / Professional / Sporty / Trendy / Natural)
+  - Setting (Indoor / Outdoor / Studio / Street)
+  - Language/Accent (native speaker filter per language)
+
+  Each actor card shows:
+  - 3-second looping preview (autoplay on hover)
+  - Voice preview button (plays ElevenLabs voice sample)
+    → DOES NOT consume generation minutes
+  - "Favourite" toggle (saved actors list)
+
+  Bulk selection: User can select up to 20 actors simultaneously
+  and attach them all to a single script for instant batch
+  generation. One click. All 20 queued. The future of A/B testing.
+
+5.3 — VIDEO GENERATION ENGINE
+
+  When the user submits a generation job:
+
+  1. API Route receives job parameters
+  2. Inngest job is queued immediately
+  3. UI shows real-time status via Supabase Realtime subscription
+     (no polling — websocket updates: Queued → Processing → Complete)
+  4. Inngest worker:
+     a. Sends script text + actor ID + voice ID to ElevenLabs
+        → returns audio file (stored in Supabase Storage)
+     b. Sends audio file + actor reference to Hedra API
+        → returns lip-synced video file
+     c. If B-Roll enabled: sends scene prompts to Runway ML
+        → returns b-roll clips
+     d. If Product Overlay enabled: sends product image through
+        Replicate depth-compositing pipeline
+        → composites product into actor's hands/body
+     e. All assets assembled via FFmpeg (serverless FFmpeg via
+        Cloudflare Workers or AWS Lambda)
+     f. AssemblyAI transcription if captions enabled
+        → burned-in captions with customisable font/style/position
+     g. If music enabled: Epidemic Sound track selected by mood
+        tag, ducked under voice using FFmpeg audio filter
+     h. Final video uploaded to Supabase Storage → CDN via
+        Cloudflare → outputUrl written to Ad record in DB
+  5. Supabase Realtime fires status update → UI refreshes
+
+  Generation time target: < 3 minutes for a 60-second ad.
+
+5.4 — BUILT-IN VIDEO EDITOR (THE BIGGEST GAP IN THE MARKET)
+
+  After generation, user enters the Editor. Built on Fabric.js +
+  custom video timeline layer.
+
+  EDITOR CAPABILITIES:
+
+  TIMELINE (bottom panel):
+  - Drag-and-drop clip ordering
+  - Trim handles on each clip (drag start/end points)
+  - B-Roll clip insertion at any point on timeline
+  - Music track lane (separate from voice track)
+  - Caption track lane
+
+  CANVAS (centre):
+  - Video preview at target aspect ratio
+  - Overlay text layers (drag to position, resize, restyle)
+  - Logo/watermark layer (upload PNG, drag to position)
+  - Sticker/emoji overlay layer
+  - Progress bar overlay option (trendy UGC pattern)
+
+  RIGHT PANEL — STYLE CONTROLS:
+  - Caption style selector (Bold/Minimal/TikTok/Gradient/Outline)
+  - Caption font selector (Google Fonts integration)
+  - Caption position (top / middle / bottom)
+  - Caption animation (Pop / Fade / Word-by-Word)
+  - Music volume slider
+  - Voice volume slider
+  - Video brightness/contrast/saturation sliders
+  - Vignette toggle
+
+  RIGHT PANEL — TRANSITIONS:
+  - Cut / Fade / Zoom / Swipe (between clips)
+
+  EXPORT PANEL:
+  User selects output formats before export:
+  ☑ 9:16 Vertical (TikTok / Reels / Shorts)
+  ☑ 1:1 Square (Feed)
+  ☑ 16:9 Landscape (YouTube / LinkedIn)
+
+  All selected formats generated simultaneously in one export job.
+  Delivered as a zip file or individual download links.
+
+  The editor state (Fabric.js JSON) is saved to the Ad.editState
+  field in the DB so users can return and re-edit at any time.
+
+5.5 — CAMPAIGN WORKSPACE & A/B TEST TRACKER
+
+  Inside each Campaign, the user sees:
+
+  SCRIPT MATRIX VIEW:
+  ┌──────────────┬──────────────┬──────────────┬──────────────┐
+  │              │  Actor 1     │  Actor 2     │  Actor 3     │
+  ├──────────────┼──────────────┼──────────────┼──────────────┤
+  │  Hook A      │  [Video ✓]   │  [Video ✓]   │  [Queued...] │
+  ├──────────────┼──────────────┼──────────────┼──────────────┤
+  │  Hook B      │  [Generate]  │  [Video ✓]   │  [Generate]  │
+  ├──────────────┼──────────────┼──────────────┼──────────────┤
+  │  Hook C      │  [Generate]  │  [Generate]  │  [Generate]  │
+  └──────────────┴──────────────┴──────────────┴──────────────┘
+
+  Click any cell → preview that ad, download, or launch generation.
+  This is the creative testing matrix that agencies dream about.
+
+  PERFORMANCE LOG (manual entry — no ad platform API in MVP):
+  User can log performance data against each ad:
+  - CTR %
+  - Hook Rate (3-second view rate) %
+  - ROAS
+  - Platform (where it ran)
+  - Notes
+  
+  Over time this builds an internal learning database per account
+  that feeds the AI script generator — "write scripts in the style
+  of my best-performing angles." Post-MVP feature, but the data
+  structure must be built now.
+
+5.6 — PRODUCT OVERLAY ENGINE
+
+  User uploads:
+  - Product image (PNG with transparent background, or JPG — we
+    auto-remove background via Replicate remove-bg model)
+  - Optionally: App screenshot (for "Show Your App" mode)
+
+  System composites the product into the AI actor's scene using
+  depth-map estimation to place product naturally in front of
+  the actor's hands. Not a simple overlay — it respects scene depth.
+
+  Modes:
+  - HOLD IT: Product in actor's hands (physical product)
+  - WEAR IT: Apparel overlay on actor's body (fashion brands)
+  - SHOW IT: Phone screen showing app/website in actor's hand
+  - BEHIND IT: Product shown large in background behind actor
+
+5.7 — MULTILINGUAL ENGINE
+
+  - Select target language before generation (30+ via DeepL)
+  - Script is translated by DeepL BEFORE sending to ElevenLabs
+    (translation → TTS, not TTS → dubbing — this is more accurate)
+  - Actor filtered to native speaker of target language where
+    available in our library
+  - Captions auto-generated in target language
+  - UI shows "Native Speaker Available" badge when a matching
+    actor exists for the selected language
+
+────────────────────────────────────────────────────────────────────────
+SECTION 6 — SITE ARCHITECTURE & PAGE ROUTES
+────────────────────────────────────────────────────────────────────────
+
+PUBLIC ROUTES (Next.js App Router):
+  /                         → Homepage (marketing)
+  /pricing                  → Fully public pricing page
+  /features/script-studio   → Feature detail page
+  /features/video-editor    → Feature detail page
+  /features/actor-library   → Feature detail page
+  /features/product-overlay → Feature detail page
+  /blog                     → Blog (MDX-based, SEO content engine)
+  /changelog                → Public changelog (build in public)
+  /about                    → Founder story (trust builder)
+  /login                    → Auth page (Supabase Auth)
+  /signup                   → Auth page (no credit card for free tier)
+
+PROTECTED APP ROUTES:
+  /dashboard                → Overview: recent ads, usage meter, quick-
+                              start CTA
+  /dashboard/projects       → Project list
+  /dashboard/projects/[id]  → Project detail → campaign list
+  /dashboard/campaigns/[id] → Campaign workspace (script matrix view)
+  /dashboard/create         → New Ad creation wizard (step-by-step)
+  /dashboard/actors         → Actor browser (full library)
+  /dashboard/editor/[adId]  → Built-in video editor
+  /dashboard/scripts        → Script library (all saved scripts)
+  /dashboard/exports        → All exports with download links
+  /dashboard/settings       → Account settings, voice clone upload
+  /dashboard/billing        → Stripe portal (self-serve, zero support)
+  /dashboard/team           → Team/workspace management
+  /api/generate             → POST: queue generation job
+  /api/scripts/generate     → POST: GPT-4o script generation
+  /api/webhooks/stripe      → Stripe webhook handler
+  /api/webhooks/inngest     → Inngest job event handler
+
+────────────────────────────────────────────────────────────────────────
+SECTION 7 — HOMEPAGE STRUCTURE (MARKETING SITE)
+────────────────────────────────────────────────────────────────────────
+
+The homepage is a long-scroll conversion page. Every section has
+ONE job. No decoration without purpose.
+
+NAV BAR:
+  [AdForge Logo]   [Features ▾] [Pricing] [Blog] [Changelog]
+  [Log In]  [Start Free — No Credit Card]
+
+  Sticky on scroll. Background becomes white/blur at scroll > 50px.
+  Mobile: hamburger menu.
+
+HERO:
+  HEADLINE (H1):
+    "The Complete AI Ad Studio.
+     Script. Generate. Edit. Publish."
+
+  SUBHEADLINE:
+    "Stop duct-taping 4 different tools together.
+     AdForge takes you from blank page to finished video ad
+     in under 10 minutes — with a built-in editor included."
+
+  CTA BLOCK:
+    [Start Free — No Credit Card Required]
+    [Watch 90-Second Demo ▶]
+
+  Below CTAs: "Join 0 marketers already using AdForge"
+  (start at 0, update this copy as numbers grow — honesty builds trust)
+
+  HERO VISUAL:
+    Split-screen animated mockup showing:
+    LEFT: Competitor workflow diagram (5 tools, arrows, chaos)
+    RIGHT: AdForge single workflow (one screen, clean)
+    — animated transition: chaos collapses into the single clean UI
+
+SOCIAL PROOF BAR:
+  "As used by teams at:" → [Logo] [Logo] [Logo] [Logo] [Logo]
+  (Seed with early adopter logos or placeholder brands at launch)
+
+PROBLEM SECTION:
+  HEADLINE: "You're stitching together too many tools."
+  Three pain point cards:
+  Card 1: "Generate in Tool A" → "Edit in Tool B" → "Caption in
+          Tool C" → "Export in Tool D" → "Pray it works"
+  Card 2: "Pay per video. Run out of credits mid-campaign."
+  Card 3: "Zero script help. You're on your own."
+  Then: "We built AdForge because we lived this."
+
+SOLUTION SECTION (feature-by-feature, alternating left/right):
+
+  BLOCK 1: AI Script Studio
+    Headline: "Start with a great script. Always."
+    Copy: Brief, punchy. Highlight hook variants, angle labels,
+          retargeting scripts, landing page copy output.
+    Visual: Screen recording / mockup of Script Studio UI
+
+  BLOCK 2: 300+ AI Actors
+    Headline: "The actor library built for ads, not boardrooms."
+    Copy: Realistic UGC-style delivery. ElevenLabs voices on ALL
+          plans. Preview voices before spending a single minute.
+    Visual: Animated actor grid with hover previews
+
+  BLOCK 3: Built-In Video Editor
+    Headline: "Edit your ad. Right here. No CapCut required."
+    Copy: Captions, music, b-roll, transitions, logo — all inside
+          AdForge. Export all 3 aspect ratios in one click.
+    Visual: Editor UI screenshot/recording
+
+  BLOCK 4: Campaign Workspace
+    Headline: "Test 20 ad variants without losing your mind."
+    Copy: The script matrix view. Visual of the grid. 
+          "See which hook wins. Log your results. Let the AI learn."
+    Visual: Campaign matrix view
+
+  BLOCK 5: Product Overlay Engine
+    Headline: "Your product. In their hands."
+    Copy: Upload your product image. Our engine composites it
+          naturally into the actor's scene. No green screen. No shoot.
+    Visual: Before/after product overlay demo
+
+PRICING SECTION:
+  Full pricing table — identical to Section 4 above.
+  Annual toggle at top (show annual savings).
+  Most popular badge on GROWTH plan.
+  FAQ below the table (6–8 questions, accordion style).
+
+TESTIMONIALS:
+  Video testimonials (3 slots — seed with founder's own use case
+  at launch if needed, replace with real users within 30 days).
+  Rotating text testimonials below video.
+
+HOW IT WORKS (3 STEPS):
+  Step 1: Write or generate your script
+  Step 2: Pick your actor and settings
+  Step 3: Generate, edit, and export
+  Time to first ad: "Under 10 minutes"
+
+FINAL CTA BLOCK:
+  HEADLINE: "Your first ad is free. No credit card. No catch."
+  [Start Building Free →]
+  Micro-copy: "3 minutes of free video output. Always."
+
+FOOTER:
+  [AdForge Logo + tagline]
+  Links: Features / Pricing / Blog / Changelog / About / Careers
+  Legal: Privacy Policy / Terms / Cookie Policy
+  Social: Twitter/X / LinkedIn / TikTok / YouTube
+  "Built by a solo founder who was tired of the same tools."
+  © 2025 AdForge AI Ltd.
+
+────────────────────────────────────────────────────────────────────────
+SECTION 8 — ONBOARDING FLOW (POST SIGN-UP)
+────────────────────────────────────────────────────────────────────────
+
+After signup (email/password or Google OAuth via Supabase):
+
+STEP 1 — WORKSPACE SETUP (30 seconds)
+  - What's your workspace name? (brand/company name)
+  - What are you primarily advertising?
+    ○ Physical product / E-commerce
+    ○ SaaS / App
+    ○ Course / Digital product
+    ○ Service / Agency
+    ○ Other
+
+STEP 2 — PLATFORM PRIORITY
+  - Which platforms do you primarily run ads on? (multi-select)
+    ☐ TikTok  ☐ Meta  ☐ YouTube  ☐ Instagram  ☐ Other
+
+STEP 3 — FIRST PROJECT CREATION
+  - Redirect immediately to: "Create your first project"
+  - Pre-filled name suggestion based on workspace name
+  - "Skip setup, take me to dashboard" option always visible
+
+NO paywall interruption at onboarding. Free tier users go straight
+to the product. Let the product sell the upgrade — not a modal.
+
+Upgrade prompts appear contextually:
+  - When user tries to generate ad #4+ on free tier
+  - When user tries to use AI Script Studio on free tier
+  - When user exceeds 3 minutes of output
+  Never aggressive. Always single-dismiss. Never full-screen lock.
+
+────────────────────────────────────────────────────────────────────────
+SECTION 9 — PERFORMANCE, ACCESSIBILITY, AND SEO
+────────────────────────────────────────────────────────────────────────
+
+PERFORMANCE TARGETS:
+  - Lighthouse Score: 95+ on all public pages
+  - Core Web Vitals: All green
+  - LCP: < 2.5s
+  - INP: < 200ms
+  - CLS: < 0.1
+  - All images: WebP format, lazy loaded, next/image component
+  - All videos: lazy loaded, poster frame shown until intersection
+
+ACCESSIBILITY:
+  - WCAG 2.1 AA compliance minimum
+  - All interactive elements keyboard navigable
+  - ARIA labels on all icon-only buttons
+  - Color contrast ratio 4.5:1 minimum on all text
+  - Skip-to-content link on all pages
+
+SEO:
+  - Dynamic OG images per page (next/og)
+  - Structured data (JSON-LD) on homepage and feature pages
+  - Sitemap auto-generated via next-sitemap
+  - Robots.txt configured
+  - Blog: MDX with front-matter, auto-generates meta tags
+  - Target keyword cluster: "AI video ad generator", "UGC video AI",
+    "AI actor video ads", "video ad maker AI" — built into H1s,
+    feature page titles, and blog content strategy
+
+────────────────────────────────────────────────────────────────────────
+SECTION 10 — MVP LAUNCH CHECKLIST
+────────────────────────────────────────────────────────────────────────
+
+The following must be true before a single user is invited:
+
+  ✅ Auth (signup / login / logout / password reset) — working
+  ✅ Free tier functional (3-min limit enforced, watermark applied)
+  ✅ Script Studio (GPT-4o, 3 variants, hook expander) — working
+  ✅ Actor library (25+ actors, filter, voice preview) — working
+  ✅ Video generation pipeline (end-to-end, including captions) — working
+  ✅ Real-time status updates (Supabase Realtime) — working
+  ✅ Built-in editor (captions, music, trim, export) — working
+  ✅ Export (9:16 + 1:1 + 16:9 in one job) — working
+  ✅ Stripe billing (all 4 tiers, annual/monthly, portal) — working
+  ✅ Usage metering (minutes tracked per user, enforced) — working
+  ✅ Email flows (welcome, first video complete, upgrade prompt) —working
+  ✅ Public pricing page — live
+  ✅ Homepage (fully designed, copy-complete) — live
+  ✅ Error tracking (Sentry) — live
+  ✅ GDPR cookie banner — compliant
+  ✅ Privacy policy + Terms of Service — published
+  ✅ Mobile responsive — all public pages + dashboard core views
+
+POST-MVP V1.1 (next sprint after first 100 users):
+  ⬜ Product Overlay Engine (Hold / Wear / Show modes)
+  ⬜ B-Roll generation (Runway ML integration)
+  ⬜ A/B performance log (manual entry)
+  ⬜ Speech-to-speech voice cloning
+  ⬜ Retargeting script generator
+  ⬜ Landing page copy generator
+  ⬜ API (Agency plan)
+  ⬜ White-label exports
+  ⬜ Actor cloning (custom avatar)
+
+────────────────────────────────────────────────────────────────────────
+FINAL NOTE FROM THE DEVELOPER (ME):
+────────────────────────────────────────────────────────────────────────
+
+This is not a feature-bloated roadmap. This is a ruthlessly scoped MVP
+with one goal: be the first AI ad tool that a performance marketer can
+use from idea to finished ad without opening another browser tab.
+
+The free tier is real and it is generous enough to prove value.
+The pricing is public because hiding it is a conversion killer.
+The editor is built because the editor IS the moat.
+The script studio is built because creative strategy IS the product.
+
+Ship this. Then listen to the first 100 users.
+Then build what THEY ask for — not what sounds cool.
+
+Everything else is noise.
+
+— Founder / Dev
+════════════════════════════════════════════════════════════════════════
